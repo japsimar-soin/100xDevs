@@ -39,11 +39,84 @@
 
   Testing the server - run `npm run test-todoServer` command in terminal
  */
-const express = require('express');
-const bodyParser = require('body-parser');
+const express = require("express");
+const bodyParser = require("body-parser");
 
 const app = express();
 
 app.use(bodyParser.json());
+
+let db = [];
+
+//Retrieve all todo items
+app.get("/todos", (req, res) => {
+	res.status(200).json(db);
+});
+
+//Retrieve a specific todo item by ID
+function findIdx(arr, id) {
+	for (let i = 0; i < arr.length; i++) {
+		if (db[i].id == id) {
+			return i;
+		}
+	}
+	return -1;
+}
+app.get("/todos/:id", (req, res) => {
+	let idx = findIdx(db, req.params.id);
+	if (idx == -1) {
+		res.status(404).send();
+	} else {
+		res.status(200).json(db[idx]);
+	}
+});
+
+//Create a new todo item
+app.post("/todos", (req, res) => {
+	const newTodo = {
+		id: Math.floor(Math.random() * 10000),
+		title: req.body.title,
+		description: req.body.description,
+	};
+	db.push(newTodo);
+	res.status(201).send(newTodo);
+});
+
+//Update an existing todo item by ID
+app.put("/todos/:id", (req, res) => {
+	let idx = findIdx(db, req.params.id);
+	if (idx == -1) {
+		res.status(404).send();
+	} else {
+		db[idx].title = req.body.title;
+		db[idx].description = req.body.description;
+		res.status(200).json(db[idx]);
+	}
+});
+
+//Delete a todo item by ID
+function deleteAtIndex(arr, id) {
+	let updatedArray = [];
+	for (let i = 0; i < arr.length; i++) {
+		if (i != id) {
+			updatedArray.push(db[i]);
+		}
+	}
+	return updatedArray;
+}
+app.delete("/todos/:id", (req, res) => {
+	let deleteIdx = findIdx(db, req.params.id);
+	if (deleteIdx == -1) {
+		res.status(404).send();
+	} else {
+		db = deleteAtIndex(db, req.params.id);
+		res.status(200).send();
+	}
+});
+
+//For any other route not defined in the server return 404
+app.use((req, res) => {
+	res.status(404).send();
+});
 
 module.exports = app;
