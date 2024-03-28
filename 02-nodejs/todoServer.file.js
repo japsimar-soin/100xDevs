@@ -1,3 +1,5 @@
+//todo server using file
+
 /**
   You need to create an express HTTP server in Node.js which will handle the logic of a todo list app.
   - Don't use any database, just store all the data in an array to store the todo list data (in-memory)
@@ -39,84 +41,120 @@
 
   Testing the server - run `npm run test-todoServer` command in terminal
  */
+
 const express = require("express");
 const bodyParser = require("body-parser");
+const fs = require("fs");
+const PORT = 3000;
 
 const app = express();
 
 app.use(bodyParser.json());
 
-let db = [];
-
-//Retrieve all todo items
+//todos.json file contains all the entries for stored objects. While reading from file, we simply res.json([data form file])
 app.get("/todos", (req, res) => {
-	res.status(200).json(db);
+	fs.readFile("todos.json", "utf8", (err, data) => {
+		if (err) throw err;
+		res.json(JSON.parse(data)); //data is what is read from the file --> parse it to JS notation
+	});
 });
 
-//Retrieve a specific todo item by ID
-function findIdx(arr, id) {
+function findIndex(arr, id) {
 	for (let i = 0; i < arr.length; i++) {
-		if (db[i].id == id) {
+		if (arr[i].id === id) {
 			return i;
 		}
 	}
-	return -1;
+    return -1;
 }
+
 app.get("/todos/:id", (req, res) => {
-	let idx = findIdx(db, req.params.id);
-	if (idx == -1) {
-		res.status(404).send();
-	} else {
-		res.status(200).json(db[idx]);
-	}
+	fs.readFile("todos.json", "utf8", (err, data) => {
+		let arr = JSON.parse(data); //JSON format mein sabki list aagyi
+		let idx = findIndex(arr, parseInt(req.params.id));
+		if (idx == -1) {
+			return res.status(404).send();
+		} else {
+			res.status(200).json(arr[idx]);
+		}
+	});
 });
 
-//Create a new todo item
 app.post("/todos", (req, res) => {
-	const newTodo = {
-		id: Math.floor(Math.random() * 1000000),
-		title: req.body.title,
-		description: req.body.description,
-	};
-	db.push(newTodo);
-	res.status(201).send(newTodo);
+    const newTodos = req.body;
+	fs.readFile("todos.json", "utf8", (err, data) => {
+		if (err) throw err;
+		let arr = JSON.parse(data);
+        newTodos.forEach(element => {
+            const newTodo = {
+                id: Math.floor(Math.random() * 1000000),
+                title: element.title,
+                description: element.description,
+            };      
+            arr.push(newTodo);
+        });
+		//write the new array back to the file
+		fs.writeFile("todos.json", JSON.stringify(arr), (err) => {
+			if (err) throw err;
+			res.status(200).json(newTodos);
+		});
+	});
 });
 
-//Update an existing todo item by ID
 app.put("/todos/:id", (req, res) => {
-	let idx = findIdx(db, req.params.id);
-	if (idx == -1) {
-		res.status(404).send();
-	} else {
-		db[idx].title = req.body.title;
-		db[idx].description = req.body.description;
-		res.status(200).json(db[idx]);
-	}
+	//agar "id" exist hi nhi krti, then directly 404, else create updated todo and add to file
+	fs.readFile("todos.json", "utf8", (err, data) => {
+		let arr = JSON.parse(data);
+		const idx = findIndex(arr, parseInt(req.params.id));
+		if (idx == -1) {
+			res.status(404).send();
+		}
+		const updatedTodo = {
+			id: arr[idx].id,
+			title: req.body.title,
+			description: req.body.description,
+		};
+		arr[idx] = updatedTodo;
+		fs.writeFile("todos.json", JSON.stringify(arr), (err) => {
+			if (err) throw err;
+			res.status(200).send(updatedTodo);
+		});
+	});
 });
 
-//Delete a todo item by ID
-function deleteAtIndex(arr, id) {
-	let updatedArray = [];
+function removeAtIndex(arr, id) {
+	let newArr = [];
 	for (let i = 0; i < arr.length; i++) {
 		if (i != id) {
-			updatedArray.push(db[i]);
+			newArr.push(arr[i]);
 		}
 	}
-	return updatedArray;
+	return newArr;
 }
+
 app.delete("/todos/:id", (req, res) => {
-	let deleteIdx = findIdx(db, req.params.id);
-	if (deleteIdx == -1) {
-		res.status(404).send();
-	} else {
-		db = deleteAtIndex(db, req.params.id);
-		res.status(200).send();
-	}
+	fs.readFile("todos.json", "utf8", (err, data) => {
+		if (err) throw err;
+		let arr = JSON.parse(data);
+		const idx = findIndex(arr, parseInt(req.params.id));
+		if (idx == -1) {
+			res.status(400).send("Invalid id");
+		} else {
+			arr = removeAtIndex(arr, idx);
+			fs.writeFile("todos.json", JSON.stringify(arr), (err) => {
+				if (err) throw err;
+				res.status(200).json();
+			});
+		}
+	});
 });
 
-//For any other route not defined in the server return 404
-app.use((req, res) => {
+app.use((req, res, next) => {
 	res.status(404).send();
+});
+
+app.listen(PORT, () => {
+	console.log("listening at port 3000");
 });
 
 module.exports = app;
